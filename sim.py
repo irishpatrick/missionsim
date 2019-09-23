@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import numpy as np
-from scipy.integrate import odeint, simps, trapz, cumtrapz
+from scipy.integrate import odeint, simps, trapz, cumtrapz, quad
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
@@ -58,7 +58,7 @@ class World:
         boltzmann = 1.38064852e-23
         return self.atm * np.exp((-1.0 * 4.81069412e-26 * self.g * height) / (boltzmann * tmp))
 
-def model(v, t, rocket, world):
+def acceleration(v, t, rocket, world):
     thrust = 0
     if (t < 2):
         thrust = rocket.motor.get_thrust(t)
@@ -74,26 +74,15 @@ def model(v, t, rocket, world):
 if __name__ == "__main__":
     rocket = Rocket()
     world = World()
-
     rocket.load("./rocket.txt")
 
     v0 = 0
     t = np.linspace(0, 5, num=1000)
+    v = odeint(acceleration, v0, t, args=(rocket, world,))
 
-    v = odeint(model, v0, t, args=(rocket, world,))
-    #print(np.array(v))
-    #print(v)
-
-    va = np.array(v)
-    ta = np.linspace(0, 5, num=va.size)
-
-    #print(va)
-    #print(ta)
-
-    x = interp1d(ta.tolist(), va.tolist(), kind="cubic")
-    #print(x)
-
-    plt.plot(t, v, 'r', t, x, 'b')
+    x = cumtrapz(np.swapaxes(v,0,1)[0], t, initial=0)
+    
+    plt.plot(t, v, "black", t, x, "red")
     plt.xlabel("time")
     plt.ylabel("v(t)")
 
