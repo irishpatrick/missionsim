@@ -1,0 +1,4 @@
+mass=10
+area=0.018
+cd=0.7
+motor=testmotor.txt
