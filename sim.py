@@ -2,7 +2,7 @@
 # see https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.odeint.html
 
 import numpy as np
-from scipy.integrate import odeint, cumtrapz
+from scipy.integrate import odeint, cumtrapz, trapz
 from scipy.optimize import *
 from scipy.interpolate import interp1d, barycentric_interpolate
 import matplotlib.pyplot as plt
@@ -38,8 +38,11 @@ class Motor:
     def __init__(self):
         self.thrust = []
         self.time = []
+        self.impulse = None
+        self.impulse_total = 0.0
         self.mass_casing = 0
         self.mass_prop = 0
+        self.mass_prop_cur = 0
 
     def load(self, fn):
         print("loading motor", fn)
@@ -71,39 +74,42 @@ class Motor:
                 if name == "mass_casing":
                     self.mass_casing = float(value)
                 elif name == "mass_prop":
-                    self.mas_prop = float(value)
+                    self.mass_prop = float(value)
+                    self.mass_prop_cur = self.mass_prop
 
                 line = fp.readline()
 
-    def get_mass(self, t):
-        s = [self.mass_casing + self.mass_prop, self.mass_prop]
-        low = self.time[0]
-        high = self.time[-1]
-        if t < low:
-            return s[0]
-        elif t > high:
-            return s[-1]
+        self.calculate()
 
-        # linear interpolation
-        # this assumes the rate of propellant burn is constant
-        # which it is not
-        return (1 - t) * s[0] + t * s[1]
+    def calculate(self):
+        self.impulse = cumtrapz(self.thrust, self.time, initial=0)
+        self.impulse_total = trapz(self.thrust, self.time)
+
+    def get_mass(self, t):
+        if t < self.time[0]:
+            return self.mass_casing + self.mass_prop
+        elif t > self.time[-1]:
+            return self.mass_casing
+
+        J = func(self.time, self.impulse)
+        prop = self.mass_prop - ((J(t) / self.impulse_total) * self.mass_prop)
+        return self.mass_casing + prop
 
     def get_thrust(self, t):
         low = self.time[0]
         high = self.time[-1]
         if t < low:
-            return 0
+            return self.thrust[0]
         if t > high:
             return 0
 
-        return interp1d(self.time, self.thrust, kind="cubic")(t)
+        return func(self.time, self.thrust)(t)
 
 class World:
     def __init__(self):
-        self.g = 9.81 # m/s/s
+        self.g = 9.8 # m/s/s
         self.atm = 101.3 # kPa
-        self.p = 1.29 # density
+        self.p = 1.225 # density
 
     def get_pressure(self, height, tmp):
         boltzmann = 1.38064852e-23
@@ -120,7 +126,6 @@ def model(v, t, rocket, world):
 
     at = thrust / rocket.get_mass(t)
     ag = world.g
-    #ad = (rocket.cd * rocket.area * world.get_pressure(x, 300) * np.power(dx, 2)) / rocket.get_mass(t)
     ad = np.sign(dx) * (0.5 * rocket.cd * rocket.area * world.p * np.power(dx, 2)) / rocket.get_mass(t)
     dvdt = [dx, at - ag - ad]
 

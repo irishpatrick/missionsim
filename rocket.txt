@@ -1,4 +1,4 @@
 mass=15
 area=0.018
-cd=0.5
+cd=0.50
 motor=CTI_910_1.txt
