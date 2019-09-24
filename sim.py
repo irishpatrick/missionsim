@@ -2,18 +2,20 @@
 # see https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.odeint.html
 
 import numpy as np
-from scipy.integrate import odeint, simps, trapz, cumtrapz, quad
-from scipy.interpolate import interp1d
+from scipy.integrate import odeint, cumtrapz
+from scipy.optimize import *
+from scipy.interpolate import interp1d, barycentric_interpolate
 import matplotlib.pyplot as plt
 
 class Rocket:
     def __init__(self):
         self.motor = Motor()
-        self.mass = 10.0 # kilograms
-        self.cd = 1.2 # guess
-        self.area = 0.018 # meters^2
+        self.mass = 0 # kilograms
+        self.cd = 0 # guess
+        self.area = 0 # meters^2
 
     def load(self, fn):
+        print("loading rocket", fn)
         with open(fn, "r") as fp:
             line = fp.readline()
             while line:
@@ -40,7 +42,7 @@ class Motor:
         self.mass_prop = 0
 
     def load(self, fn):
-        print("loading motor ", fn)
+        print("loading motor", fn)
         with open(fn, "r") as fp:
             line = fp.readline()
             read_thrust_data = False
@@ -74,7 +76,18 @@ class Motor:
                 line = fp.readline()
 
     def get_mass(self, t):
-        return 2 
+        s = [self.mass_casing + self.mass_prop, self.mass_prop]
+        low = self.time[0]
+        high = self.time[-1]
+        if t < low:
+            return s[0]
+        elif t > high:
+            return s[-1]
+
+        # linear interpolation
+        # this assumes the rate of propellant burn is constant
+        # which it is not
+        return (1 - t) * s[0] + t * s[1]
 
     def get_thrust(self, t):
         low = self.time[0]
@@ -95,7 +108,12 @@ class World:
         boltzmann = 1.38064852e-23
         return self.atm * np.exp((-1.0 * 4.81069412e-26 * self.g * height) / (boltzmann * tmp))
 
-def acceleration(v, t, rocket, world):
+def func(x, y):
+    return interp1d(x, y, kind="cubic", fill_value="extrapolate")
+
+# the first order diffeq
+# soon to be second order :(
+def model(v, t, rocket, world):
     thrust = rocket.motor.get_thrust(t)
 
     at = thrust / rocket.get_mass(t)
@@ -112,13 +130,29 @@ if __name__ == "__main__":
     rocket.load("./rocket.txt")
 
     v0 = 0
-    t = np.linspace(0, 34)
-    v = odeint(acceleration, v0, t, args=(rocket, world,))
-
+    t = np.linspace(0, 40)
+    v = odeint(model, v0, t, args=(rocket, world,))
     x = cumtrapz(np.swapaxes(v,0,1)[0], t, initial=0)
-    
-    plt.plot(t, v, "blue", t, x, "black")
-    plt.xlabel("time")
-    plt.ylabel("v(t)")
 
+    end = leastsq(func(t, x), 30)[0][0]
+
+    fig, ax1 = plt.subplots()
+
+    color = "tab:red"
+    ax1.set_xlabel("time (s)")
+    ax1.set_ylabel("v(t)")
+    ax1.plot(t, v, color=color)
+    ax1.tick_params(axis="y", labelcolor=color)
+    ax1.set_xlim([0, end])
+    ax1.set_ylim(-200)
+
+    ax2 = ax1.twinx()
+    color = "tab:blue"
+    ax2.set_ylabel("x(t)")
+    ax2.plot(t, x, color=color)
+    ax2.tick_params(axis="y", labelcolor=color)
+    ax2.set_xlim([0, end])
+    ax2.set_ylim(0)
+
+    fig.tight_layout()
     plt.show()
