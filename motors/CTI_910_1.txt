@@ -1,5 +1,5 @@
-mass_casing=0.1
-mass_prop=2.5158
+mass_casing=0
+mass_prop=2.6158
 
 begin thrust
 
