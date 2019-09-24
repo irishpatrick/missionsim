@@ -59,8 +59,8 @@ class Motor:
                     read_thrust_data = False
 
                 if read_thrust_data and line != "":
-                    force = float(line.split(" ")[0])
-                    time = float(line.split(" ")[1])
+                    force = float(line.split(" ")[1])
+                    time = float(line.split(" ")[0])
 
                     self.time.append(time)
                     self.thrust.append(force)
@@ -102,25 +102,27 @@ class Motor:
 class World:
     def __init__(self):
         self.g = 9.81 # m/s/s
-        self.atm = 0.133322 # kPa
+        self.atm = 101.3 # kPa
+        self.p = 1.29
 
     def get_pressure(self, height, tmp):
         boltzmann = 1.38064852e-23
-        return self.atm * np.exp((-1.0 * 4.81069412e-26 * self.g * height) / (boltzmann * tmp))
+        return self.atm * np.exp((-1.0 * 4.8156e-26 * self.g * height) / (boltzmann * tmp))
 
 def func(x, y):
     return interp1d(x, y, kind="cubic", fill_value="extrapolate")
 
-# the first order diffeq
-# soon to be second order :(
+# the second order diffeq
 def model(v, t, rocket, world):
+    x, dx = v
+
     thrust = rocket.motor.get_thrust(t)
 
     at = thrust / rocket.get_mass(t)
     ag = world.g
-    ad = (rocket.cd * rocket.area * world.atm * np.power(v, 2)) / rocket.get_mass(t)
-
-    dvdt = at - (ag + ad)
+    #ad = (rocket.cd * rocket.area * world.get_pressure(x, 300) * np.power(dx, 2)) / rocket.get_mass(t)
+    ad = np.sign(dx) * (0.5 * rocket.cd * rocket.area * world.p * np.power(dx, 2)) / rocket.get_mass(t)
+    dvdt = [dx, at - ag - ad]
 
     return dvdt
 
@@ -129,30 +131,22 @@ if __name__ == "__main__":
     world = World()
     rocket.load("./rocket.txt")
 
-    v0 = 0
-    t = np.linspace(0, 40)
-    v = odeint(model, v0, t, args=(rocket, world,))
-    x = cumtrapz(np.swapaxes(v,0,1)[0], t, initial=0)
+    v0 = [0, 0]
+    t = np.linspace(0, 50, 1000)
+    solution = odeint(model, v0, t, args=(rocket, world,))
+    x = solution[:, 0]
+    v = solution[:, 1]
 
     end = leastsq(func(t, x), 30)[0][0]
+    v_terminal = func(t, v)(end)
 
-    fig, ax1 = plt.subplots()
+    print("Terminal Velocity:", v_terminal)
 
-    color = "tab:red"
-    ax1.set_xlabel("time (s)")
-    ax1.set_ylabel("v(t)")
-    ax1.plot(t, v, color=color)
-    ax1.tick_params(axis="y", labelcolor=color)
-    ax1.set_xlim([0, end])
-    ax1.set_ylim(-200)
+    plt.plot(t, x, color="black", label="x(t)")
+    plt.plot(t, v, color="red", label="v(t)")
+    plt.xlabel("t")
+    plt.xlim([0, end])
+    plt.ylim(-500)
+    plt.grid()
 
-    ax2 = ax1.twinx()
-    color = "tab:blue"
-    ax2.set_ylabel("x(t)")
-    ax2.plot(t, x, color=color)
-    ax2.tick_params(axis="y", labelcolor=color)
-    ax2.set_xlim([0, end])
-    ax2.set_ylim(0)
-
-    fig.tight_layout()
     plt.show()
