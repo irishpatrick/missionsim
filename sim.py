@@ -103,7 +103,7 @@ class World:
     def __init__(self):
         self.g = 9.81 # m/s/s
         self.atm = 101.3 # kPa
-        self.p = 1.29
+        self.p = 1.29 # density
 
     def get_pressure(self, height, tmp):
         boltzmann = 1.38064852e-23
@@ -138,9 +138,6 @@ if __name__ == "__main__":
     v = solution[:, 1]
 
     end = leastsq(func(t, x), 30)[0][0]
-    v_terminal = func(t, v)(end)
-
-    print("Terminal Velocity:", v_terminal)
 
     plt.plot(t, x, color="black", label="x(t)")
     plt.plot(t, v, color="red", label="v(t)")

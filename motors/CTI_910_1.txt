@@ -1,5 +1,5 @@
-mass_casing=1
-mass_prop=4
+mass_casing=0.6
+mass_prop=2
 
 begin thrust
 
