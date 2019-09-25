@@ -7,6 +7,8 @@ from scipy.optimize import *
 from scipy.interpolate import interp1d, barycentric_interpolate
 import matplotlib.pyplot as plt
 
+#from vehicle import *
+
 class Rocket:
     def __init__(self):
         self.motor = Motor()
